@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Neon Clash v2</title>
+  <script src="https://cdn.jsdelivr.net/npm/colyseus.js@0.14.23/dist/colyseus.min.js"></script>
+  <style>
+    body { margin:0; background:#000; color:#0ff; font-family: monospace; }
+    canvas { background: #001122; display:block; margin:0 auto; }
+    #ui { position:absolute; top:0; left:0; width:100%; pointer-events:none; }
+    #lobby { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,255,255,0.2); padding:40px; border:2px solid #0ff; text-align:center; }
+    button, input { background:#0ff; color:#000; padding:10px 20px; margin:10px; font-size:18px; border:none; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <canvas id="c" width="1024" height="576"></canvas>
+  <div id="ui">
+    <div id="lobby">
+      <h1>Neon Clash</h1>
+      <button onclick="createRoom()">Oda Oluştur</button><br>
+      <input id="join" placeholder="Oda Kodu">
+      <button onclick="joinRoom()">Katıl</button>
+      <div id="code"></div>
+    </div>
+    <div id="info" style="display:none; position:absolute; top:10px; left:10px; font-size:24px;">
+      Zaman: <span id="timer">90</span>s
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    let client, room;
+    let keys = {};
+
+    window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; sendKeys(); });
+    window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; sendKeys(); });
+
+    function sendKeys() {
+      if (room) room.send({ type: "input", keys });
+    }
+
+    async function createRoom() {
+      client = new Colyseus.Client("ws://localhost:2567");
+      room = await client.joinOrCreate("game");
+      document.getElementById('lobby').style.display = 'none';
+      document.getElementById('info').style.display = 'block';
+      document.getElementById('code').innerHTML = 'Oda Kodu: ' + room.id;
+    }
+
+    async function joinRoom() {
+      const code = document.getElementById('join').value;
+      if (!code) return alert('Kod gir!');
+      client = new Colyseus.Client("ws://localhost:2567");
+      room = await client.joinById(code);
+      document.getElementById('lobby').style.display = 'none';
+      document.getElementById('info').style.display = 'block';
+    }
+
+    room?.onStateChange(state => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      state.players.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 50, 100);
+        ctx.fillStyle = '#fff';
+        ctx.fillText('Damage: ' + p.damage, p.x, p.y - 10);
+      });
+      document.getElementById('timer').innerText = Math.ceil(state.timeLeft);
+      if (state.winner) alert(state.winner);
+    });
+
+    setInterval(sendKeys, 50);
+  </script>
+</body>
+</html>
